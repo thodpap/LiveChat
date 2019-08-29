@@ -87,8 +87,8 @@ int main()
     server_info.sin_port = htons(8888);
 
     // Connect to Server
-    int err = connect(clientSocket, (struct sockaddr *)&server_info, s_addrlen);
-    if (err == -1) {
+    int con = connect(clientSocket, (struct sockaddr *)&server_info, s_addrlen);
+    if (con == -1) {
         printf("Connection to Server error!\n");
         exit(EXIT_FAILURE);
     }
