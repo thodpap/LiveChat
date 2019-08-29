@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "string.h"
 
-void str_trim_lf (char* arr, int length) {
+void clearArray(char* arr, int length) {
     int i;
     for (i = 0; i < length; i++) { // trim \n
         if (arr[i] == '\n') {
@@ -11,7 +11,7 @@ void str_trim_lf (char* arr, int length) {
     }
 }
 
-void str_overwrite_stdout() {
+void clearOutput() {
     printf("\r%s", "> ");
-    //fflush(stdout);
+    fflush(stdout);
 }

@@ -13,20 +13,20 @@
 
 // Global variables
 volatile sig_atomic_t flag = 0;
-int sockfd = 0;
-char nickname[LENGTH_NAME] = {};
+int clientSocket = 0;
+char username[NAME] = {};
 
-void catch_ctrl_c_and_exit(int sig) {
+void cntrl_c_exit(int sig) {
     flag = 1;
 }
 
 void recv_msg_handler() {
-    char receiveMessage[LENGTH_SEND] = {};
+    char rbuffer[SEND] = {};
     while (1) {
-        int receive = recv(sockfd, receiveMessage, LENGTH_SEND, 0);
+        int receive = recv(clientSocket, rbuffer, SEND, 0);
         if (receive > 0) {
-            printf("\r%s\n", receiveMessage);
-            str_overwrite_stdout();
+            printf("\r%s\n", rbuffer);
+            clearOutput();
         } else if (receive == 0) {
             break;
         } else { 
@@ -36,47 +36,47 @@ void recv_msg_handler() {
 }
 
 void send_msg_handler() {
-    char message[LENGTH_MSG] = {};
+    char message[MSG] = {};
     while (1) {
-        str_overwrite_stdout();
-        while (fgets(message, LENGTH_MSG, stdin) != NULL) {
-            str_trim_lf(message, LENGTH_MSG);
+        clearOutput();
+        while (fgets(message, MSG, stdin) != NULL) {
+            clearArray(message, MSG);
             if (strlen(message) == 0) {
-                str_overwrite_stdout();
+                clearOutput();
             } else {
                 break;
             }
         }
-        send(sockfd, message, LENGTH_MSG, 0);
+        send(clientSocket, message, MSG, 0);
         if (strcmp(message, "exit") == 0) {
             break;
         }
     }
-    catch_ctrl_c_and_exit(2);
+    cntrl_c_exit(2);
 }
 
 int main()
 {
-    signal(SIGINT, catch_ctrl_c_and_exit);
+    signal(SIGINT, cntrl_c_exit);
 
     // Naming
     printf("Please enter your name: ");
-    if (fgets(nickname, LENGTH_NAME, stdin) != NULL) {
-        str_trim_lf(nickname, LENGTH_NAME);
+    if (fgets(username, NAME, stdin) != NULL) {
+        clearArray(username, NAME);
     }
-    if (strlen(nickname) < 2 || strlen(nickname) >= LENGTH_NAME-1) {
+    if (strlen(username) < 2 || strlen(username) >= NAME-1) {
         printf("\nName must be more than one and less than thirty characters.\n");
         exit(EXIT_FAILURE);
     }
 
-    // Create socket
-    sockfd = socket(AF_INET , SOCK_STREAM , 0);
-    if (sockfd == -1) {
-        printf("Fail to create a socket.");
+    // Create clientSocket
+    clientSocket = socket(AF_INET , SOCK_STREAM , 0);
+    if (clientSocket == -1) {
+        printf("Fail to create a clientSocket.");
         exit(EXIT_FAILURE);
     }
 
-    // Socket information
+    // clientSocket information
     struct sockaddr_in server_info, client_info;
     int s_addrlen = sizeof(server_info);
     int c_addrlen = sizeof(client_info);
@@ -87,19 +87,19 @@ int main()
     server_info.sin_port = htons(8888);
 
     // Connect to Server
-    int err = connect(sockfd, (struct sockaddr *)&server_info, s_addrlen);
+    int err = connect(clientSocket, (struct sockaddr *)&server_info, s_addrlen);
     if (err == -1) {
         printf("Connection to Server error!\n");
         exit(EXIT_FAILURE);
     }
     
     // Names
-    getsockname(sockfd, (struct sockaddr*) &client_info, (socklen_t*) &c_addrlen);
-    getpeername(sockfd, (struct sockaddr*) &server_info, (socklen_t*) &s_addrlen);
+    getsockname(clientSocket, (struct sockaddr*) &client_info, (socklen_t*) &c_addrlen);
+    getpeername(clientSocket, (struct sockaddr*) &server_info, (socklen_t*) &s_addrlen);
     printf("Connect to Server: %s:%d\n", inet_ntoa(server_info.sin_addr), ntohs(server_info.sin_port));
     printf("You are: %s:%d\n", inet_ntoa(client_info.sin_addr), ntohs(client_info.sin_port));
 
-    send(sockfd, nickname, LENGTH_NAME, 0);
+    send(clientSocket, username, NAME, 0);
 
     pthread_t send_msg_thread;
     if (pthread_create(&send_msg_thread, NULL, (void *) send_msg_handler, NULL) != 0) {
@@ -120,6 +120,6 @@ int main()
         }
     }
 
-    close(sockfd);
+    close(clientSocket);
     return 0;
 }

@@ -2,21 +2,21 @@
 #define LIST
 
 typedef struct ClientNode {
-    int data;
+    int sock;
     struct ClientNode* prev;
     struct ClientNode* link;
     char ip[16];
     char name[31];
-} ClientList;
+}ClientList;
 
-ClientList *newNode(int sockfd, char* ip) {
-    ClientList *np = (ClientList *)malloc( sizeof(ClientList) );
-    np->data = sockfd;
-    np->prev = NULL;
-    np->link = NULL;
-    strncpy(np->ip, ip, 16);
-    strncpy(np->name, "NULL", 5);
-    return np;
+ClientList *newNode(int socket, char* ip) {
+    ClientList *client = (ClientList *)malloc( sizeof(ClientList) );
+    client->sock = socket;
+    client->prev = NULL;
+    client->link = NULL;
+    strncpy(client->ip, ip, 16);
+    strncpy(client->name, "NULL", 5);
+    return client;
 }
 
 #endif // LIST
