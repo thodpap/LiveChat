@@ -1,17 +1,18 @@
-#include <cstdio>
-#include <cstdlib>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <unistd.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#inlcude <netinet/in.h>
-#include <arpa/intet.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <pthread.h>
 
-#include "string.h"
 #include "proto.h"
+#include "string.h"
 
 volatile sig_atomic_t flag = 0;
 char username[LENGTH_NAME] = {};
@@ -38,7 +39,7 @@ void sendHandler(){
         clearStdout();
         while(fgets(msg,LENGTH_MSG,stdin) != NULL){
             clearArray(msg,LENGTH_MSG);
-            if(strlen(message) == 0)
+            if(strlen(msg) == 0)
                 clearStdout();
             else
                 break;
@@ -64,29 +65,47 @@ int main(int argc,const char *argv[]){
         exit(EXIT_FAILURE);
     }
     struct sockaddr_in serverInfo,clientInfo;
+    int sLen = sizeof(serverInfo);
+    int cLen = sizeof(clientInfo);
 
-    memset(&serverInfo, 0 , sizeof(serverInfo));
-    memset(&clientInfo, 0 , sizeof(clientInfo));
+    memset(&serverInfo, 0 , sLen);
+    memset(&clientInfo, 0 , cLen);
 
     serverInfo.sin_family = AF_INET;
     serverInfo.sin_addr.s_addr = inet_addr("127.0.0.1");
     serverInfo.sin_port = htons(PORT);
 
-    if(connect(clientSocket, (struct sockaddr *)&serverInfo, sizeof(serverInfo)) < 0){
+    if(connect(clientSocket, (struct sockaddr *)&serverInfo, sLen) < 0){
         printf("Error to Connect to Server\n");
         exit(EXIT_FAILURE);
     }
     // Get Names
-    getsockname(clientSocket, (struct sockaddr_in)&clientInfo, (socklen_t *)&(sizeof(clientInfo)));
-    getpeername(clientSocket, (struct sockaddr_in)&serverInfo, (socklen_t *)&(sizeof(serverInfo)));
+    getsockname(clientSocket, (struct sockaddr *)&clientInfo, (socklen_t *)&cLen);
+    getpeername(clientSocket, (struct sockaddr *)&serverInfo, (socklen_t *)&sLen);
 
-    printf("Connect to Server: %s:%d\n", inet_ntoa(server_info.sin_addr), ntohs(server_info.sin_port));
-    printf("You are: %s:%d\n", inet_ntoa(client_info.sin_addr), ntohs(client_info.sin_port));
+    printf("Connect to Server: %s:%d\n", inet_ntoa(serverInfo.sin_addr), ntohs(serverInfo.sin_port));
+    printf("You are: %s:%d\n", inet_ntoa(clientInfo.sin_addr), ntohs(clientInfo.sin_port));
 
     send(clientSocket,username,LENGTH_NAME,0);
 
-    // pthread... for sending and receiving messages using pthread_create and pthread_t
+    pthread_t sendThread;
+    if (pthread_create(&sendThread, NULL, (void *)sendHandler, NULL) != 0) {
+        printf ("Create pthread error!\n");
+        exit(EXIT_FAILURE);
+    }
 
+    pthread_t recThread;
+    if (pthread_create(&recThread, NULL, (void *)recvHandler, NULL) != 0) {
+        printf ("Create pthread error!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    while (true) {
+        if(flag) {
+            printf("\nBye\n");
+            break;
+        }
+    }
     close(clientSocket);
     return 0;
 }

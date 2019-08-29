@@ -12,7 +12,7 @@ void clearArray(char *arr,int length){
 	}
 }
 void clearStdout(){
-	print("\r%s","> ");
+	printf("\r%s","> ");
 	fflush(stdout);
 }
 
