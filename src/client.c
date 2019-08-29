@@ -29,34 +29,31 @@ void recieveHandler() {
             clearOutput();
         } else if (receive == 0) {
             break;
-        } else { 
-            // -1 
-        }
+        } 
     }
 }
 
 void sendHandler() {
-    char message[MSG] = {};
+    char msg[MSG] = {};
     while (1) {
         clearOutput();
-        while (fgets(message, MSG, stdin) != NULL) {
-            clearArray(message, MSG);
-            if (strlen(message) == 0) {
+        while (fgets(msg, MSG, stdin) != NULL) {
+            clearArray(msg, MSG);
+            if (strlen(msg) == 0) {
                 clearOutput();
             } else {
                 break;
             }
         }
-        send(clientSocket, message, MSG, 0);
-        if (strcmp(message, "exit") == 0) {
+        send(clientSocket, msg, MSG, 0);
+        if (strcmp(msg, "exit") == 0) {
             break;
         }
     }
     cntrl_c_exit(2);
 }
 
-int main()
-{
+int main(){
     signal(SIGINT, cntrl_c_exit);
 
     // Naming
@@ -80,8 +77,10 @@ int main()
     struct sockaddr_in server_info, client_info;
     int s_addrlen = sizeof(server_info);
     int c_addrlen = sizeof(client_info);
+    
     memset(&server_info, 0, s_addrlen);
     memset(&client_info, 0, c_addrlen);
+    
     server_info.sin_family = PF_INET;
     server_info.sin_addr.s_addr = inet_addr("127.0.0.1");
     server_info.sin_port = htons(8888);
