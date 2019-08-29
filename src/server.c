@@ -3,117 +3,164 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-
 #include <arpa/inet.h>
 #include <pthread.h>
+#include "proto.h" 
 
-#include "proto.h"
-#include "string.h"
-
-typedef struct ClientNode{
-    int sock;
-    struct ClientNode* next;
+typedef struct ClientNode {
+    int data;
     struct ClientNode* prev;
+    struct ClientNode* link;
     char ip[16];
     char name[31];
-}ClientList;
+} ClientList;
 
-ClientList *node,*copy;
-
-ClientList *newNode(int socket,char *ip){
-    ClientList *l = (ClientList *)malloc(sizeof(ClientList));
-    l->sock = socket;
-    l->next = NULL;
-    l->prev = NULL;
-    strncpy(l->ip, ip, 16);
-    strncpy(l->name, "NULL", 5);
-    return l;
+ClientList *newNode(int sockfd, char* ip) {
+    ClientList *np = (ClientList *)malloc( sizeof(ClientList) );
+    np->data = sockfd;
+    np->prev = NULL;
+    np->link = NULL;
+    strncpy(np->ip, ip, 16);
+    strncpy(np->name, "NULL", 5);
+    return np;
 }
-// I need a function that can send a msg to all clients
-void sendEverywhere(ClientList *l, char *msg){
-    ClientList *temp = node;
-    while(temp != NULL){
-        // Except the same client, then
-        if(l->sock != temp->sock){
-            printf("Send to socket %d: \"%s\" \n", temp->sock, msg);
-            send(temp->sock,msg,LENGTH_SEND,0);
+
+// Global variables
+int server_sockfd = 0, client_sockfd = 0;
+ClientList *root, *now; // now is copy
+
+void catch_ctrl_c_and_exit(int sig) {
+    ClientList *tmp;
+    while (root != NULL) {
+        printf("\nClose socketfd: %d\n", root->data);
+        close(root->data); // close all socket include server_sockfd
+        tmp = root;
+        root = root->link;
+        free(tmp);
+    }
+    printf("Bye\n");
+    exit(EXIT_SUCCESS);
+}
+
+void send_to_all_clients(ClientList *np, char tmp_buffer[]) {
+    ClientList *tmp = root->link;
+    while (tmp != NULL) {
+        if (np->data != tmp->data) { // all clients except itself.
+            printf("Send to sockfd %d: \"%s\" \n", tmp->data, tmp_buffer);
+            send(tmp->data, tmp_buffer, LENGTH_SEND, 0);
         }
-        temp = temp->prev;
+        tmp = tmp->link;
     }
 }
-void clientHandler(void *c){
-    int flag2 = 0;
-    char username[LENGTH_NAME] = {};
-    char rbuffer[LENGTH_MSG] = {}; // receive buffer
-    char sbuffer[LENGTH_SEND] = {}; // send buffer
-    
-    ClientList *client = (ClientList *)c;
-    //return NULL;
+
+void client_handler(void *p_client) {
+    int leave_flag = 0;
+    char nickname[LENGTH_NAME] = {};
+    char recv_buffer[LENGTH_MSG] = {};
+    char send_buffer[LENGTH_SEND] = {};
+    ClientList *np = (ClientList *)p_client;
+
+    // Naming
+    if (recv(np->data, nickname, LENGTH_NAME, 0) <= 0 || strlen(nickname) < 2 || strlen(nickname) >= LENGTH_NAME-1) {
+        printf("%s didn't input name.\n", np->ip);
+        leave_flag = 1;
+    } else {
+        strncpy(np->name, nickname, LENGTH_NAME);
+        printf("%s(%s)(%d) join the chatroom.\n", np->name, np->ip, np->data);
+        sprintf(send_buffer, "%s join the chatroom.", np->name, np->ip);
+        send_to_all_clients(np, send_buffer);
+    }
+
+    // Conversation
+    while (1) {
+        if (leave_flag) {
+            break;
+        }
+        int receive = recv(np->data, recv_buffer, LENGTH_MSG, 0);
+        if (receive > 0) {
+            if (strlen(recv_buffer) == 0) {
+                continue;
+            }
+            sprintf(send_buffer, "%s：%s", np->name, recv_buffer);
+        } else if (receive == 0 || strcmp(recv_buffer, "exit") == 0) {
+            printf("%s(%s)(%d) leave the chatroom.\n", np->name, np->ip, np->data);
+            sprintf(send_buffer, "%s(%s) leave the chatroom.", np->name, np->ip);
+            leave_flag = 1;
+        } else {
+            printf("Fatal Error: -1\n");
+            leave_flag = 1;
+        }
+        send_to_all_clients(np, send_buffer);
+    }
+
+    // Remove Node
+    close(np->data);
+    if (np == now) { // remove an edge node
+        now = np->prev;
+        now->link = NULL;
+    } else { // remove a middle node
+        np->prev->link = np->link;
+        np->link->prev = np->prev;
+    }
+    free(np);
 }
-int main(){
-//     It might fix some issues;
-//     signal(SIGINT, catch_ctrl_c_and_exit);
+
+int main()
+{
+    printf("hey\n");
+    signal(SIGINT, catch_ctrl_c_and_exit);
+
     // Create socket
-    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket < 0) {
+    server_sockfd = socket(AF_INET , SOCK_STREAM , 0);
+    if (server_sockfd == -1) {
         printf("Fail to create a socket.");
         exit(EXIT_FAILURE);
     }
-    
+
     // Socket information
-    struct sockaddr_in serverInfo, clientInfo;
-    int sLen = sizeof(serverInfo);
-    int cLen = sizeof (clientInfo);
+    struct sockaddr_in server_info, client_info;
+    int s_addrlen = sizeof(server_info);
+    int c_addrlen = sizeof(client_info);
+    memset(&server_info, 0, s_addrlen);
+    memset(&client_info, 0, c_addrlen);
+    server_info.sin_family = PF_INET;
+    server_info.sin_addr.s_addr = INADDR_ANY;
+    server_info.sin_port = htons(8888);
 
-    memset(&serverInfo, 0, sLen);
-    memset(&clientInfo, 0, cLen);
-
-    serverInfo.sin_family = AF_INET;
-    serverInfo.sin_addr.s_addr = INADDR_ANY;
-    serverInfo.sin_port = htons(PORT);
-    
     // Bind and Listen
-    if(bind(serverSocket, (struct sockaddr *)&serverInfo, sLen) < 0){
-        printf("Error in binding\n");
-        exit(EXIT_FAILURE);
-    }
-    if(listen(serverSocket, 5) < 0){
-        printf("Error in listening\n");
-        exit(EXIT_FAILURE);
-    }
-    
+    bind(server_sockfd, (struct sockaddr *)&server_info, s_addrlen);
+    listen(server_sockfd, 5);
+
     // Print Server IP
-    getsockname(serverSocket, (struct sockaddr*) &serverInfo, (socklen_t*)&sLen);
-    printf("Start Server on: %s:%d\n", inet_ntoa(serverInfo.sin_addr), ntohs(serverInfo.sin_port));
-    
+    getsockname(server_sockfd, (struct sockaddr*) &server_info, (socklen_t*) &s_addrlen);
+    printf("Start Server on: %s:%d\n", inet_ntoa(server_info.sin_addr), ntohs(server_info.sin_port));
+
     // Initial linked list for clients
-    node = newNode(serverSocket, inet_ntoa(serverInfo.sin_addr));
-    copy = node;
+    root = newNode(server_sockfd, inet_ntoa(server_info.sin_addr));
+    now = root;
 
-    while(1){
-        // Accept the socket
-        int clientSocket = accept(serverSocket,(struct sockaddr*) &clientInfo, (socklen_t*) &cLen);
+    while (1) {
+        client_sockfd = accept(server_sockfd, (struct sockaddr*) &client_info, (socklen_t*) &c_addrlen);
 
-        // print ip
-        getpeername(clientSocket, (struct sockaddr*) &clientInfo, (socklen_t*) &cLen);
-        printf("Client %s:%d come in.\n", inet_ntoa(clientInfo.sin_addr), ntohs(clientInfo.sin_port));
-        
-        // Link the Clients, adding a link to the new client
-        ClientList *c = newNode(clientSocket,inet_ntoa(clientInfo.sin_addr));
-        c->next = copy;
-        copy->prev = c;
-        copy = c;
-        
-        // Create the thread
+        // Print Client IP
+        getpeername(client_sockfd, (struct sockaddr*) &client_info, (socklen_t*) &c_addrlen);
+        printf("Client %s:%d come in.\n", inet_ntoa(client_info.sin_addr), ntohs(client_info.sin_port));
+
+        // Append linked list for clients
+        ClientList *c = newNode(client_sockfd, inet_ntoa(client_info.sin_addr));
+        c->prev = now;
+        now->link = c;
+        now = c;
+
         pthread_t id;
-        if (pthread_create(&id, NULL,(void *) clientHandler, (void* )c) != 0) {
+        if (pthread_create(&id, NULL, (void *)client_handler, (void *)c) != 0) {
             perror("Create pthread error!\n");
             exit(EXIT_FAILURE);
         }
     }
+
     return 0;
 }

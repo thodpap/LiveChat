@@ -3,99 +3,112 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
 #include <pthread.h>
-
 #include "proto.h"
 #include "string.h"
 
+// Global variables
 volatile sig_atomic_t flag = 0;
-char username[LENGTH_NAME] = {};
-int clientSocket = 0;
+int sockfd = 0;
+char nickname[LENGTH_NAME] = {};
 
-void ctrl_c_exit(int sig){
+void catch_ctrl_c_and_exit(int sig) {
     flag = 1;
 }
 
-void recvHandler(){
-    char msg[LENGTH_SEND] = {};
-    while(1){
-        int receive = recv(clientSocket,msg,LENGTH_SEND,0); //length of the message
-        if(receive > 0){
-            printf("\r%s\n",msg); // \r is to print with the cursor full left
-            clearStdout();
-        }
-        else if(receive == 0) break;
-    }
-}
-void sendHandler(){
-    char msg[LENGTH_MSG] = {};
-    while(1){
-        clearStdout();
-        while(fgets(msg,LENGTH_MSG,stdin) != NULL){
-            clearArray(msg,LENGTH_MSG);
-            if(strlen(msg) == 0)
-                clearStdout();
-            else
-                break;
-        }
-        // Ready to send
-        send(clientSocket,msg,LENGTH_MSG,0);
-        if(strcmp(msg, "exit") == 0)
+void recv_msg_handler() {
+    char receiveMessage[LENGTH_SEND] = {};
+    while (1) {
+        int receive = recv(sockfd, receiveMessage, LENGTH_SEND, 0);
+        if (receive > 0) {
+            printf("\r%s\n", receiveMessage);
+            str_overwrite_stdout();
+        } else if (receive == 0) {
             break;
+        } else { 
+            // -1 
+        }
     }
-    ctrl_c_exit(2);
 }
-int main(int argc,const char *argv[]){
-    signal(SIGINT,ctrl_c_exit);
-    printf("Enter me you name: ");
-    if(fgets(username, LENGTH_NAME, stdin) != NULL)
-        clearArray(username,LENGTH_NAME);
-    // I suppose that a valid name is provided
-    // An invalid name is with less than 2 characters, or more than LENGTH_NAME - 1 characters
 
-    clientSocket = socket(AF_INET,SOCK_STREAM,0);
-    if(clientSocket < 0){
-        printf("Failed to create the socket\n");
+void send_msg_handler() {
+    char message[LENGTH_MSG] = {};
+    while (1) {
+        str_overwrite_stdout();
+        while (fgets(message, LENGTH_MSG, stdin) != NULL) {
+            str_trim_lf(message, LENGTH_MSG);
+            if (strlen(message) == 0) {
+                str_overwrite_stdout();
+            } else {
+                break;
+            }
+        }
+        send(sockfd, message, LENGTH_MSG, 0);
+        if (strcmp(message, "exit") == 0) {
+            break;
+        }
+    }
+    catch_ctrl_c_and_exit(2);
+}
+
+int main()
+{
+    signal(SIGINT, catch_ctrl_c_and_exit);
+
+    // Naming
+    printf("Please enter your name: ");
+    if (fgets(nickname, LENGTH_NAME, stdin) != NULL) {
+        str_trim_lf(nickname, LENGTH_NAME);
+    }
+    if (strlen(nickname) < 2 || strlen(nickname) >= LENGTH_NAME-1) {
+        printf("\nName must be more than one and less than thirty characters.\n");
         exit(EXIT_FAILURE);
     }
-    struct sockaddr_in serverInfo,clientInfo;
-    int sLen = sizeof(serverInfo);
-    int cLen = sizeof(clientInfo);
 
-    memset(&serverInfo, 0 , sLen);
-    memset(&clientInfo, 0 , cLen);
-
-    serverInfo.sin_family = AF_INET;
-    serverInfo.sin_addr.s_addr = inet_addr("127.0.0.1");
-    serverInfo.sin_port = htons(PORT);
-
-    if(connect(clientSocket, (struct sockaddr *)&serverInfo, sLen) < 0){
-        printf("Error to Connect to Server\n");
+    // Create socket
+    sockfd = socket(AF_INET , SOCK_STREAM , 0);
+    if (sockfd == -1) {
+        printf("Fail to create a socket.");
         exit(EXIT_FAILURE);
     }
-    // Get Names
-    getsockname(clientSocket, (struct sockaddr *)&clientInfo, (socklen_t *)&cLen);
-    getpeername(clientSocket, (struct sockaddr *)&serverInfo, (socklen_t *)&sLen);
 
-    printf("Connect to Server: %s:%d\n", inet_ntoa(serverInfo.sin_addr), ntohs(serverInfo.sin_port));
-    printf("You are: %s:%d\n", inet_ntoa(clientInfo.sin_addr), ntohs(clientInfo.sin_port));
+    // Socket information
+    struct sockaddr_in server_info, client_info;
+    int s_addrlen = sizeof(server_info);
+    int c_addrlen = sizeof(client_info);
+    memset(&server_info, 0, s_addrlen);
+    memset(&client_info, 0, c_addrlen);
+    server_info.sin_family = PF_INET;
+    server_info.sin_addr.s_addr = inet_addr("127.0.0.1");
+    server_info.sin_port = htons(8888);
 
-    send(clientSocket,username,LENGTH_NAME,0);
+    // Connect to Server
+    int err = connect(sockfd, (struct sockaddr *)&server_info, s_addrlen);
+    if (err == -1) {
+        printf("Connection to Server error!\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    // Names
+    getsockname(sockfd, (struct sockaddr*) &client_info, (socklen_t*) &c_addrlen);
+    getpeername(sockfd, (struct sockaddr*) &server_info, (socklen_t*) &s_addrlen);
+    printf("Connect to Server: %s:%d\n", inet_ntoa(server_info.sin_addr), ntohs(server_info.sin_port));
+    printf("You are: %s:%d\n", inet_ntoa(client_info.sin_addr), ntohs(client_info.sin_port));
 
-    pthread_t sendThread;
-    if (pthread_create(&sendThread, NULL, (void *)sendHandler, NULL) != 0) {
+    send(sockfd, nickname, LENGTH_NAME, 0);
+
+    pthread_t send_msg_thread;
+    if (pthread_create(&send_msg_thread, NULL, (void *) send_msg_handler, NULL) != 0) {
         printf ("Create pthread error!\n");
         exit(EXIT_FAILURE);
     }
 
-    pthread_t recThread;
-    if (pthread_create(&recThread, NULL, (void *)recvHandler, NULL) != 0) {
+    pthread_t recv_msg_thread;
+    if (pthread_create(&recv_msg_thread, NULL, (void *) recv_msg_handler, NULL) != 0) {
         printf ("Create pthread error!\n");
         exit(EXIT_FAILURE);
     }
@@ -106,6 +119,7 @@ int main(int argc,const char *argv[]){
             break;
         }
     }
-    close(clientSocket);
+
+    close(sockfd);
     return 0;
 }
