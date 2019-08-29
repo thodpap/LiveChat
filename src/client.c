@@ -20,7 +20,7 @@ void cntrl_c_exit(int sig) {
     flag = 1;
 }
 
-void recv_msg_handler() {
+void recieveHandler() {
     char rbuffer[SEND] = {};
     while (1) {
         int receive = recv(clientSocket, rbuffer, SEND, 0);
@@ -35,7 +35,7 @@ void recv_msg_handler() {
     }
 }
 
-void send_msg_handler() {
+void sendHandler() {
     char message[MSG] = {};
     while (1) {
         clearOutput();
@@ -96,19 +96,24 @@ int main()
     // Names
     getsockname(clientSocket, (struct sockaddr*) &client_info, (socklen_t*) &c_addrlen);
     getpeername(clientSocket, (struct sockaddr*) &server_info, (socklen_t*) &s_addrlen);
-    printf("Connect to Server: %s:%d\n", inet_ntoa(server_info.sin_addr), ntohs(server_info.sin_port));
-    printf("You are: %s:%d\n", inet_ntoa(client_info.sin_addr), ntohs(client_info.sin_port));
+    
+    printf("Connect to Server: %s:%d\n", inet_ntoa(server_info.sin_addr), 
+    
+    ntohs(server_info.sin_port));
+    
+    printf("You are: %s:%d\n", inet_ntoa(client_info.sin_addr), 
+    ntohs(client_info.sin_port));
 
     send(clientSocket, username, NAME, 0);
 
-    pthread_t send_msg_thread;
-    if (pthread_create(&send_msg_thread, NULL, (void *) send_msg_handler, NULL) != 0) {
+    pthread_t sThread;
+    if (pthread_create(&sThread, NULL, (void *) sendHandler, NULL) != 0) {
         printf ("Create pthread error!\n");
         exit(EXIT_FAILURE);
     }
 
-    pthread_t recv_msg_thread;
-    if (pthread_create(&recv_msg_thread, NULL, (void *) recv_msg_handler, NULL) != 0) {
+    pthread_t rThread;
+    if (pthread_create(&rThread, NULL, (void *) recieveHandler, NULL) != 0) {
         printf ("Create pthread error!\n");
         exit(EXIT_FAILURE);
     }
