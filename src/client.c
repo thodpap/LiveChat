@@ -68,40 +68,41 @@ int main(){
 
     // Create clientSocket
     clientSocket = socket(AF_INET , SOCK_STREAM , 0);
-    if (clientSocket == -1) {
+    if (clientSocket < 0) {
         printf("Fail to create a clientSocket.");
         exit(EXIT_FAILURE);
     }
 
     // clientSocket information
-    struct sockaddr_in server_info, client_info;
-    int s_addrlen = sizeof(server_info);
-    int c_addrlen = sizeof(client_info);
+    struct sockaddr_in serverInfo, clientInfo;
+    int sAddrLen = sizeof(serverInfo);
+    int cAddrLen = sizeof(clientInfo);
     
-    memset(&server_info, 0, s_addrlen);
-    memset(&client_info, 0, c_addrlen);
+    memset(&serverInfo, 0, sAddrLen);
+    memset(&clientInfo, 0, cAddrLen);
     
-    server_info.sin_family = PF_INET;
-    server_info.sin_addr.s_addr = inet_addr("127.0.0.1");
-    server_info.sin_port = htons(8888);
+    serverInfo.sin_family = AF_INET;
+    serverInfo.sin_addr.s_addr = inet_addr("127.0.0.1");
+    // local ("127.0.0.1"); // pc addr ("192.168.50.211");
+    serverInfo.sin_port = htons(PORT);
 
     // Connect to Server
-    int con = connect(clientSocket, (struct sockaddr *)&server_info, s_addrlen);
-    if (con == -1) {
+    int con = connect(clientSocket, (struct sockaddr *)&serverInfo, sAddrLen);
+    if (con < 0) {
         printf("Connection to Server error!\n");
         exit(EXIT_FAILURE);
     }
     
     // Names
-    getsockname(clientSocket, (struct sockaddr*) &client_info, (socklen_t*) &c_addrlen);
-    getpeername(clientSocket, (struct sockaddr*) &server_info, (socklen_t*) &s_addrlen);
+    getsockname(clientSocket, (struct sockaddr*) &clientInfo, (socklen_t*) &cAddrLen);
+    getpeername(clientSocket, (struct sockaddr*) &serverInfo, (socklen_t*) &sAddrLen);
     
-    printf("Connect to Server: %s:%d\n", inet_ntoa(server_info.sin_addr), 
+    printf("Connect to Server: %s:%d\n", inet_ntoa(serverInfo.sin_addr), 
     
-    ntohs(server_info.sin_port));
+    ntohs(serverInfo.sin_port));
     
-    printf("You are: %s:%d\n", inet_ntoa(client_info.sin_addr), 
-    ntohs(client_info.sin_port));
+    printf("You are: %s:%d\n", inet_ntoa(clientInfo.sin_addr), 
+    ntohs(clientInfo.sin_port));
 
     send(clientSocket, username, NAME, 0);
 

@@ -12,6 +12,6 @@ void clearArray(char* arr, int length) {
 }
 
 void clearOutput() {
-    printf("\r%s", "> ");
-    fflush(stdout);
+    //printf("\r%s", "> ");
+    //fflush(stdout);
 }

@@ -117,7 +117,7 @@ int main()
 
     serverInfo.sin_family = PF_INET;
     serverInfo.sin_addr.s_addr = INADDR_ANY;
-    serverInfo.sin_port = htons(8888);
+    serverInfo.sin_port = htons(PORT);
 
     // Bind and Listen
     int b = bind(serverSocket, (struct sockaddr *)&serverInfo, s_addrlen);
