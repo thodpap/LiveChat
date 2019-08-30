@@ -73,8 +73,8 @@ void clientHandler(void *p_client) {
             }
             sprintf(send_buffer, "%s：%s", client->name, recv_buffer);
         } else if (receive == 0 || strcmp(recv_buffer, "exit") == 0) {
-            printf("%s(%s)(%d) leave the chatroom.\n", client->name, client->ip, client->sock);
-            sprintf(send_buffer, "%s(%s) leave the chatroom.", client->name, client->ip);
+            printf("%s(%s)(%d) left the chat.\n", client->name, client->ip, client->sock);
+            sprintf(send_buffer, "%s(%s) left the chat.", client->name, client->ip);
             leave_flag = 1;
         } else {
             printf("Fatal Error: -1\n");
@@ -95,9 +95,7 @@ void clientHandler(void *p_client) {
     free(client);
 }
 
-int main()
-{
-    printf("hey\n");
+int main(){
     signal(SIGINT, cntrl_c_exit);
 
     // Create clientSocket
@@ -115,13 +113,13 @@ int main()
     memset(&serverInfo, 0, s_addrlen);
     memset(&clientInfo, 0, c_addrlen);
 
-    serverInfo.sin_family = PF_INET;
-    serverInfo.sin_addr.s_addr = INADDR_ANY;
+    serverInfo.sin_family = AF_INET;
+    serverInfo.sin_addr.s_addr = INADDR_ANY; // inet_addr("IP_ADDR");
     serverInfo.sin_port = htons(PORT);
 
     // Bind and Listen
-    int b = bind(serverSocket, (struct sockaddr *)&serverInfo, s_addrlen);
-    int l = listen(serverSocket, 5);
+    bind(serverSocket, (struct sockaddr *)&serverInfo, s_addrlen);
+    listen(serverSocket, 5);
 //     if(b < 0 || l <= 0){
 //         printf("Error on bind or listen\n");
 //         exit(EXIT_FAILURE);
