@@ -82,7 +82,7 @@ int main(){
     memset(&clientInfo, 0, cAddrLen);
     
     serverInfo.sin_family = AF_INET;
-    serverInfo.sin_addr.s_addr = inet_addr("192.168.1.13");//INADDR_ANY; // inet_addr("IP_ADDR");
+    serverInfo.sin_addr.s_addr = inet_addr(INADDR_ANY); // inet_addr("IP_ADDR");
     serverInfo.sin_port = htons(PORT);
 
     // Connect to Server
